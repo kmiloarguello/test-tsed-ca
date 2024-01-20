@@ -1,24 +1,33 @@
 import { User } from "src/models";
-import { UserService } from "src/service";
+import { emailAndPasswordAreValid } from "src/utils";
+import { Repository } from "typeorm";
 
-import { Controller, Get, Post } from "@tsed/common";
+import { Controller, Get, Inject, Post } from "@tsed/common";
 import { BodyParams, PathParams } from "@tsed/platform-params";
 
 @Controller("/users")
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(
+    @Inject(User) private readonly userRepository: Repository<User>
+  ) {}
 
   @Post("/signup")
   register(@BodyParams() user: User): Promise<User> {
-    return this.userService.save(user);
+    return this.userRepository.save(user);
   }
 
   @Post("/login")
   login(
     @BodyParams() email: string,
     @BodyParams() password: string
-  ): Promise<User> {
-    return this.userService.login(email, password);
+  ): Promise<any> | { error: string } {
+    const user = this.userRepository.findOne({ where: { email } });
+    if (user && emailAndPasswordAreValid(email, password)) {
+      const res = { ...user, token: "token" };
+      return res;
+    } else {
+      return { error: "Invalid credentials" };
+    }
   }
 
   @Post("/logout")
@@ -28,11 +37,11 @@ export class UserController {
 
   @Get("/")
   async getAll(): Promise<User[]> {
-    return [];
+    return this.userRepository.find();
   }
 
   @Get("/:id")
-  async get(@PathParams() id: string): Promise<User> {
-    return this.userService.findOne(id);
+  async get(@PathParams() id: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { id: Number(id) } });
   }
 }
